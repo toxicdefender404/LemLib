@@ -729,18 +729,6 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         // apply restrictions on lateral speed
         lateralOut = std::clamp(lateralOut, -params.maxSpeed, params.maxSpeed);
 
-        // constrain lateral output by max accel
-        if (!close) lateralOut = slew(lateralOut, prevLateralOut, lateralSettings.slew);
-
-        // constrain lateral output by the max speed it can travel at without
-        // slipping
-        const float radius = 1 / fabs(getCurvature(pose, carrot));
-        const float maxSlipSpeed(sqrt(params.chasePower * radius * 9.8));
-        lateralOut = std::clamp(lateralOut, -maxSlipSpeed, maxSlipSpeed);
-        // prioritize angular movement over lateral movement
-        const float overturn = fabs(angularOut) + fabs(lateralOut) - params.maxSpeed;
-        if (overturn > 0) lateralOut -= lateralOut > 0 ? overturn : -overturn;
-
         // prevent moving in the wrong direction
         if (params.forwards && !close) lateralOut = std::fmax(lateralOut, 0);
         else if (!params.forwards && !close) lateralOut = std::fmin(lateralOut, 0);
@@ -749,6 +737,19 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         if (params.forwards && lateralOut < fabs(params.minSpeed) && lateralOut > 0) lateralOut = fabs(params.minSpeed);
         if (!params.forwards && -lateralOut < fabs(params.minSpeed) && lateralOut < 0)
             lateralOut = -fabs(params.minSpeed);
+
+        // constrain lateral output by the max speed it can travel at without
+        // slipping
+        const float radius = 1 / fabs(getCurvature(pose, carrot));
+        const float maxSlipSpeed(sqrt(params.chasePower * radius * 9.8));
+        lateralOut = std::clamp(lateralOut, -maxSlipSpeed, maxSlipSpeed);
+
+        // prioritize angular movement over lateral movement
+        const float overturn = fabs(angularOut) + fabs(lateralOut) - params.maxSpeed;
+        if (overturn > 0) lateralOut -= lateralOut > 0 ? overturn : -overturn;
+
+        // constrain lateral output by max accel
+        if (!close) lateralOut = slew(lateralOut, prevLateralOut, lateralSettings.slew);
 
         // update previous output
         prevAngularOut = angularOut;
@@ -871,9 +872,6 @@ void lemlib::Chassis::moveToPoint(float x, float y, int timeout, MoveToPointPara
 
         // apply restrictions on lateral speed
         lateralOut = std::clamp(lateralOut, -params.maxSpeed, params.maxSpeed);
-        // constrain lateral output by max accel
-        // but not for decelerating, since that would interfere with settling
-        if (!close) lateralOut = slew(lateralOut, prevLateralOut, lateralSettings.slew);
 
         // prevent moving in the wrong direction
         if (params.forwards && !close) lateralOut = std::fmax(lateralOut, 0);
@@ -883,6 +881,10 @@ void lemlib::Chassis::moveToPoint(float x, float y, int timeout, MoveToPointPara
         if (params.forwards && lateralOut < fabs(params.minSpeed) && lateralOut > 0) lateralOut = fabs(params.minSpeed);
         if (!params.forwards && -lateralOut < fabs(params.minSpeed) && lateralOut < 0)
             lateralOut = -fabs(params.minSpeed);
+        
+        // constrain lateral output by max accel
+        // but not for decelerating, since that would interfere with settling
+        if (!close) lateralOut = slew(lateralOut, prevLateralOut, lateralSettings.slew);
 
         // update previous output
         prevAngularOut = angularOut;
