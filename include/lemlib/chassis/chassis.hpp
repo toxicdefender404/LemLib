@@ -234,7 +234,8 @@ struct SwingToHeadingParams {
 struct MoveToPoseParams {
         bool forwards = true;
         float chasePower = 0;
-        float lead = 0.6;
+        float dlead = 0.6;
+        float glead = 0;
         float maxSpeed = 127;
         float minSpeed = 0;
         float earlyExitRange = 0;
@@ -464,6 +465,7 @@ class Chassis {
          */
         void resetLocalPosition();
     protected:
+        bool semiCircleExit(Pose target,Pose current,float radius,float earlyExitRange=0);
         /**
          * @brief Indicates that this motion is queued and blocks current task until this motion reaches front of queue
          */

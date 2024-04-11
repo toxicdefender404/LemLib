@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cmath>
 #include <math.h>
 #include <optional>
+#include "lemlib/pose.hpp"
 #include "pros/motors.h"
 #include "pros/motors.hpp"
 #include "pros/misc.hpp"
@@ -612,7 +614,11 @@ void lemlib::Chassis::swingToHeading(float theta, DriveSide lockedSide, int time
     distTraveled = -1;
     this->endMotion();
 }
-
+bool lemlib::Chassis::semiCircleExit(Pose target,Pose current,float radius,float earlyExitRange){
+    Pose dif = current-target;
+    dif.theta = degToRad(target.theta+45);
+    return (dif.x*sin(dif.theta)+dif.y*cos(dif.theta)>dif.x*cos(dif.theta)-dif.y*sin(dif.theta)-earlyExitRange*(dif.distance({0,0})<radius));
+}
 /**
  * @brief Move the chassis towards the target pose
  *
@@ -665,6 +671,11 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
     float prevAngularOut = 0; // previous angular power
     const int compState = pros::competition::get_status();
 
+    const Pose initCarrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * lastPose.distance(target);
+    Pose carrot = initCarrot;
+    Pose prevCarrot = carrot;
+    bool cancelGhost = false;
+    bool cancelCarrot = false;
     // main loop
     while (!timer.isDone() &&
            ((!lateralSettled || (!angularLargeExit.getExit() && !angularSmallExit.getExit())) || !close) &&
@@ -689,7 +700,18 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         if (lateralLargeExit.getExit() && lateralSmallExit.getExit()) lateralSettled = true;
 
         // calculate the carrot point
-        Pose carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.lead * distTarget;
+        if (!cancelGhost) {
+            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget; //normal carrot
+            carrot = initCarrot + (carrot-initCarrot)*(1-params.glead); //ghost carrot
+        } 
+        else if (!cancelCarrot) { 
+            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget; //normal carrot
+        } 
+        else {
+            // switch to the target
+            carrot = target;
+        }
+        carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget;
         if (close) carrot = target; // settling behavior
 
         // calculate if the robot is on the same side as the carrot point
@@ -737,13 +759,13 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         if (params.forwards && lateralOut < fabs(params.minSpeed) && lateralOut > 0) lateralOut = fabs(params.minSpeed);
         if (!params.forwards && -lateralOut < fabs(params.minSpeed) && lateralOut < 0)
             lateralOut = -fabs(params.minSpeed);
-
+        
         // constrain lateral output by the max speed it can travel at without
         // slipping
         const float radius = 1 / fabs(getCurvature(pose, carrot));
         const float maxSlipSpeed(sqrt(params.chasePower * radius * 9.8));
         lateralOut = std::clamp(lateralOut, -maxSlipSpeed, maxSlipSpeed);
-
+        
         // prioritize angular movement over lateral movement
         const float overturn = fabs(angularOut) + fabs(lateralOut) - params.maxSpeed;
         if (overturn > 0) lateralOut -= lateralOut > 0 ? overturn : -overturn;
