@@ -661,8 +661,6 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
     if (params.chasePower == 0) params.chasePower = drivetrain.chasePower;
 
     // initialize vars used between iterations
-    Pose lastPose = getPose();
-    distTraveled = 0;
     Timer timer(timeout);
     bool close = false;
     bool lateralSettled = false;
@@ -671,11 +669,15 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
     float prevAngularOut = 0; // previous angular power
     const int compState = pros::competition::get_status();
 
-    const Pose initCarrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * lastPose.distance(target);
+    Pose lastPose = getPose();
+    distTraveled = 0;
+    const float initialDistance = lastPose.distance(target);
+    const Pose initCarrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead ;
     Pose carrot = initCarrot;
     Pose prevCarrot = carrot;
     bool cancelGhost = false;
     bool cancelCarrot = false;
+
     // main loop
     while (!timer.isDone() &&
            ((!lateralSettled || (!angularLargeExit.getExit() && !angularSmallExit.getExit())) || !close) &&
@@ -701,18 +703,16 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
 
         // calculate the carrot point
         if (!cancelGhost) {
-            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget; //normal carrot
+            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget/initialDistance; //normal carrot
             carrot = initCarrot + (carrot-initCarrot)*(1-params.glead); //ghost carrot
         } 
         else if (!cancelCarrot) { 
-            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget; //normal carrot
+            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget/initialDistance; //normal carrot
         } 
         else {
             // switch to the target
             carrot = target;
         }
-        carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget;
-        if (close) carrot = target; // settling behavior
 
         // calculate if the robot is on the same side as the carrot point
         const bool robotSide =
