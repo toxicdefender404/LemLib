@@ -657,9 +657,9 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
     Pose target(x, y, M_PI_2 - degToRad(theta));
     if (!params.forwards) target.theta = fmod(target.theta + M_PI, 2 * M_PI); // backwards movement
 
-    // use global chasePower is chasePower is 0
+    // use global chasePower/slew if unset
     if (params.chasePower == 0) params.chasePower = drivetrain.chasePower;
-
+    if (params.slew == 0) params.slew = lateralSettings.slew;
     // initialize vars used between iterations
     Timer timer(timeout);
     bool close = false;
@@ -672,7 +672,7 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
     Pose lastPose = getPose();
     distTraveled = 0;
     const float initialDistance = lastPose.distance(target);
-    const Pose initCarrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead ;
+    const Pose initCarrot = target - Pose(cos(target.theta), sin(target.theta)) * params.Dlead ;
     Pose carrot = initCarrot;
     Pose prevCarrot = carrot;
     bool cancelGhost = false;
@@ -703,11 +703,11 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
 
         // calculate the carrot point
         if (!cancelGhost) {
-            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget/initialDistance; //normal carrot
-            carrot = initCarrot + (carrot-initCarrot)*(1-params.glead); //ghost carrot
+            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.Dlead * distTarget/initialDistance; //normal carrot
+            carrot = initCarrot + (carrot-initCarrot)*(1-params.Glead); //ghost carrot
         } 
         else if (!cancelCarrot) { 
-            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.dlead * distTarget/initialDistance; //normal carrot
+            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.Dlead * distTarget/initialDistance; //normal carrot
         } 
         else {
             // switch to the target
@@ -767,11 +767,11 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         lateralOut = std::clamp(lateralOut, -maxSlipSpeed, maxSlipSpeed);
         
         // prioritize angular movement over lateral movement
-        const float overturn = fabs(angularOut) + fabs(lateralOut) - params.maxSpeed;
+        const float overturn = fabs(angularOut) + fabs(lateralOut) - params.maxSpeed - params.maxSpeed*params.smoothness;
         if (overturn > 0) lateralOut -= lateralOut > 0 ? overturn : -overturn;
 
         // constrain lateral output by max accel
-        if (!close) lateralOut = slew(lateralOut, prevLateralOut, lateralSettings.slew);
+        if (!close) lateralOut = slew(lateralOut, prevLateralOut, params.slew);
 
         // update previous output
         prevAngularOut = angularOut;

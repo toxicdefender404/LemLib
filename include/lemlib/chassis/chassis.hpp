@@ -234,10 +234,12 @@ struct SwingToHeadingParams {
 struct MoveToPoseParams {
         bool forwards = true;
         float chasePower = 0;
-        float dlead = 0.6;
-        float glead = 0;
+        float smoothness = 0;
+        float Dlead = 0.6;
+        float Glead = 0;
         float maxSpeed = 127;
         float minSpeed = 0;
+        float slew = 0;
         float earlyExitRange = 0;
 };
 
