@@ -614,10 +614,10 @@ void lemlib::Chassis::swingToHeading(float theta, DriveSide lockedSide, int time
     distTraveled = -1;
     this->endMotion();
 }
-bool lemlib::Chassis::semiCircleExit(Pose target,Pose current,float radius,float earlyExitRange){
+bool lemlib::Chassis::passedTarget(Pose target,Pose current,float radius,float earlyExitRange){
     Pose dif = current-target;
     dif.theta = degToRad(target.theta+45);
-    return (dif.x*sin(dif.theta)+dif.y*cos(dif.theta)>dif.x*cos(dif.theta)-dif.y*sin(dif.theta)-earlyExitRange*(dif.distance({0,0})<radius));
+    return (dif.x*sin(dif.theta)+dif.y*cos(dif.theta)>dif.x*cos(dif.theta)-dif.y*sin(dif.theta)-earlyExitRange);
 }
 /**
  * @brief Move the chassis towards the target pose
@@ -662,7 +662,6 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
     if (params.slew == 0) params.slew = lateralSettings.slew;
     // initialize vars used between iterations
     Timer timer(timeout);
-    bool close = false;
     bool lateralSettled = false;
     bool prevSameSide = false;
     float prevLateralOut = 0; // previous lateral power
@@ -680,7 +679,7 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
 
     // main loop
     while (!timer.isDone() &&
-           ((!lateralSettled || (!angularLargeExit.getExit() && !angularSmallExit.getExit())) || !close) &&
+           ((!lateralSettled || (!angularLargeExit.getExit() && !angularSmallExit.getExit())) || !cancelCarrot) &&
            this->motionRunning) {
         // update position
         const Pose pose = getPose(true, true);
@@ -691,12 +690,6 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
 
         // calculate distance to the target point
         const float distTarget = pose.distance(target);
-
-        // check if the robot is close enough to the target to start settling
-        if (distTarget < 7.5 && close == false) {
-            close = true;
-            params.maxSpeed = fmax(fabs(prevLateralOut), 60);
-        }
 
         // check if the lateral controller has settled
         if (lateralLargeExit.getExit() && lateralSmallExit.getExit()) lateralSettled = true;
@@ -714,6 +707,10 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
             carrot = target;
         }
 
+        if (pose.distance(carrot)<3) {
+            if (!cancelGhost) cancelGhost = true;
+            else if (!cancelCarrot) cancelCarrot = true;
+        }
         // calculate if the robot is on the same side as the carrot point
         const bool robotSide =
             (pose.y - target.y) * -sin(target.theta) <= (pose.x - target.x) * cos(target.theta) + params.earlyExitRange;
@@ -721,18 +718,18 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
                                 (carrot.x - target.x) * cos(target.theta) + params.earlyExitRange;
         const bool sameSide = robotSide == carrotSide;
         // exit if close
-        if (!sameSide && prevSameSide && close && params.minSpeed != 0) break;
+        if (!sameSide && prevSameSide && cancelCarrot && params.minSpeed != 0) break;
         prevSameSide = sameSide;
 
         // calculate error
         const float adjustedRobotTheta = params.forwards ? pose.theta : pose.theta + M_PI;
         const float angularError =
-            close ? angleError(adjustedRobotTheta, target.theta) : angleError(adjustedRobotTheta, pose.angle(carrot));
+            cancelCarrot ? angleError(adjustedRobotTheta, target.theta) : angleError(adjustedRobotTheta, pose.angle(carrot));
         float lateralError = pose.distance(carrot);
         // only use cos when settling
         // otherwise just multiply by the sign of cos
         // maxSlipSpeed takes care of lateralOut
-        if (close) lateralError *= cos(angleError(pose.theta, pose.angle(carrot)));
+        if (cancelCarrot) lateralError *= cos(angleError(pose.theta, pose.angle(carrot)));
         else lateralError *= sgn(cos(angleError(pose.theta, pose.angle(carrot))));
 
         // update exit conditions
@@ -752,8 +749,8 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         lateralOut = std::clamp(lateralOut, -params.maxSpeed, params.maxSpeed);
 
         // prevent moving in the wrong direction
-        if (params.forwards && !close) lateralOut = std::fmax(lateralOut, 0);
-        else if (!params.forwards && !close) lateralOut = std::fmin(lateralOut, 0);
+        if (params.forwards && !cancelCarrot) lateralOut = std::fmax(lateralOut, 0);
+        else if (!params.forwards && !cancelCarrot) lateralOut = std::fmin(lateralOut, 0);
 
         // constrain lateral output by the minimum speed
         if (params.forwards && lateralOut < fabs(params.minSpeed) && lateralOut > 0) lateralOut = fabs(params.minSpeed);
@@ -771,7 +768,7 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         if (overturn > 0) lateralOut -= lateralOut > 0 ? overturn : -overturn;
 
         // constrain lateral output by max accel
-        if (!close) lateralOut = slew(lateralOut, prevLateralOut, params.slew);
+        if (!cancelCarrot) lateralOut = slew(lateralOut, prevLateralOut, params.slew);
 
         // update previous output
         prevAngularOut = angularOut;

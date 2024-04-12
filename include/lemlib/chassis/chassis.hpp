@@ -467,7 +467,7 @@ class Chassis {
          */
         void resetLocalPosition();
     protected:
-        bool semiCircleExit(Pose target,Pose current,float radius,float earlyExitRange=0);
+        bool passedTarget(Pose target,Pose current,float radius,float earlyExitRange=0);
         /**
          * @brief Indicates that this motion is queued and blocks current task until this motion reaches front of queue
          */
