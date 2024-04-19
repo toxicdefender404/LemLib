@@ -6,3 +6,4 @@
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
 #include "lemlib/logger/logger.hpp"
+#include "lemlib/controller.hpp"
