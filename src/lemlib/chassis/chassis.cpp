@@ -671,6 +671,7 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
     Pose lastPose = getPose();
     distTraveled = 0;
     const float initialDistance = lastPose.distance(target);
+    if(params.Dlead/initialDistance>0.95) params.Dlead = 0.95*initialDistance; // ensures Dlead approaches target
     const Pose initCarrot = target - Pose(cos(target.theta), sin(target.theta)) * params.Dlead ;
     Pose carrot = initCarrot;
     Pose prevCarrot = carrot;
@@ -708,8 +709,12 @@ void lemlib::Chassis::moveToPose(float x, float y, float theta, int timeout, Mov
         }
 
         if (pose.distance(carrot)<3) {
-            if (!cancelGhost) cancelGhost = true;
-            else if (!cancelCarrot) cancelCarrot = true;
+            pros::Controller master(pros::E_CONTROLLER_MASTER);
+            if (!cancelGhost) {
+            cancelGhost = true;
+            carrot = target - Pose(cos(target.theta), sin(target.theta)) * params.Dlead * distTarget/initialDistance;
+            }
+            if (!cancelCarrot) {cancelCarrot = true;master.rumble(".");}
         }
         // calculate if the robot is on the same side as the carrot point
         const bool robotSide =
