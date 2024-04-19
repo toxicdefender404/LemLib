@@ -30,7 +30,7 @@ struct OdomSensors {
          * @param imu pointer to the IMU
          */
         OdomSensors(TrackingWheel* vertical1, TrackingWheel* vertical2, TrackingWheel* horizontal1,
-                    TrackingWheel* horizontal2, pros::Imu* imu, float imuMult);
+                    TrackingWheel* horizontal2, pros::Imu* imu, float imuMult = 1);
         TrackingWheel* vertical1;
         TrackingWheel* vertical2;
         TrackingWheel* horizontal1;
