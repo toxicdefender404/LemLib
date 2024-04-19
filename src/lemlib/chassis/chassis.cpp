@@ -27,13 +27,13 @@
  * @param imu pointer to the IMU
  */
 lemlib::OdomSensors::OdomSensors(TrackingWheel* vertical1, TrackingWheel* vertical2, TrackingWheel* horizontal1,
-                                 TrackingWheel* horizontal2, pros::Imu* imu)
+                                 TrackingWheel* horizontal2, pros::Imu* imu,float imuMult)
     : vertical1(vertical1),
       vertical2(vertical2),
       horizontal1(horizontal1),
       horizontal2(horizontal2),
-      imu(imu) {}
-
+      imu(imu),
+      imuMult(imuMult) {}
 /**
  * @brief The constants are stored in a struct so that they can be easily passed to the chassis class
  * Set a constant to 0 and it will be ignored
