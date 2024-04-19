@@ -34,10 +34,10 @@ namespace controller {
             }
 
             if(pressing){
-                releasedTimer = pros::millis()-switchedTime;
+                heldTimer = pros::millis()-switchedTime;
             }
             else{
-                heldTimer = pros::millis()-switchedTime;
+                releasedTimer = pros::millis()-switchedTime;     
             }
 
             prevpressing = pressing;
@@ -67,11 +67,11 @@ namespace controller {
         controller::Down.update();
     }
     
-    float driveCurve(float input, float deadzone, float scale, float maxjoy, float minvolt, float maxvolt) {
+    inline float driveCurve(float input, float deadzone, float scale, float maxjoy, float minvolt, float maxvolt) {
         if(fabs(input)>deadzone){
             return (input *
         (powf(2.718, -(scale / (0.1* maxjoy))) + powf(2.718, (fabs(input) - maxjoy) / (0.1*maxjoy)) * (1 - powf(2.718, -(scale / (0.1*maxjoy))))) 
-        *(1-(minvolt/maxvolt)) * (maxvolt/maxjoy) + minvolt * lemlib::sgn(input));
+        *(1-(minvolt/maxvolt)) * (maxvolt/maxjoy) + minvolt * (input<0?-1:1));
         }
         else{
             return 0;
